@@ -29,14 +29,14 @@ ENABLE_RPMB_SUPPORT := 1
 ifeq ($(VERIFIED_BOOT),1)
 ifneq (,$(findstring DISPLAY_SPLASH_SCREEN,$(DEFINES)))
 #enable fbcon display menu
-ENABLE_FBCON_DISPLAY_MSG := 1
+#  ENABLE_FBCON_DISPLAY_MSG := 1
 endif
 endif
 
 ifeq ($(VERIFIED_BOOT_2),1)
 ifneq (,$(findstring DISPLAY_SPLASH_SCREEN,$(DEFINES)))
 #enable fbcon display menu
-  ENABLE_FBCON_DISPLAY_MSG := 1
+#  ENABLE_FBCON_DISPLAY_MSG := 1
 endif
 endif
 
