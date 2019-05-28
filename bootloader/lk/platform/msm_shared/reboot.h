@@ -43,6 +43,8 @@ enum reboot_reason {
 #endif
 	DM_VERITY_ENFORCING	= 0x05,
 	DM_VERITY_KEYSCLEAR	= 0x06,
+	SWITCH_MODE_USER	= 0x07,
+	SWITCH_MODE_TEST	= 0x08,
 #else
 	REBOOT_MODE_UNKNOWN	= 0x00,
 	RECOVERY_MODE		= 0x77665502,
@@ -55,6 +57,8 @@ enum reboot_reason {
 #endif
 	DM_VERITY_ENFORCING	= 0x77665509,
 	DM_VERITY_KEYSCLEAR	= 0x7766550A,
+	SWITCH_MODE_USER	= 0x77665506,
+	SWITCH_MODE_TEST	= 0x77665507,
 #endif
 	/* Don't write the reason to PON reg or SMEM
 	 * if the value is more than 0xF0000000
