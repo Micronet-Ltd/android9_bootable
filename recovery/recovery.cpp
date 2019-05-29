@@ -1994,8 +1994,14 @@ error:
       break;
 
     default:
+    	//add by xxf
       ui->Print("Rebooting...\n");
-      reboot("reboot,");
+      if(should_wipe_data){
+               reboot("reboot,userswitch");
+     }else{
+               reboot("reboot,");
+     }
+      //add by xxf
       break;
   }
   while (true) {

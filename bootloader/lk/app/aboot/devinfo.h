@@ -59,5 +59,6 @@ struct device_info
 	uint64_t rollback_index[MAX_VB_PARTITIONS];
 	uint32_t user_public_key_length;
 	uint8_t user_public_key[MAX_USER_KEY_SIZE];
+	bool is_usermode;
 };
 #endif
