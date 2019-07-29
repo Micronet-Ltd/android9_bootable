@@ -5089,7 +5089,7 @@ void aboot_init(const struct app_descriptor *app)
 #endif
 
 	//add by xxf
-	if(device.is_usermode){
+	if(1 /*device.is_usermode*/) {
 			target_serialno((unsigned char *) sn_buf);
 		}else{
 			sprintf(sn_buf, "%s", "cc3d6802");
