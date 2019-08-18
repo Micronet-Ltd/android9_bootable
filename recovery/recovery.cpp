@@ -120,6 +120,8 @@ static const char *LAST_KMSG_FILE = "/cache/recovery/last_kmsg";
 static const char *LAST_LOG_FILE = "/cache/recovery/last_log";
 static const char *CACH_RECOVERY_FILE = "/cache/msm8953_64-incremental-ota.zip";
 static const char *SD_RECOVERY_FILE = "/sdcard/msm8953_64-incremental-ota.zip";
+static const char *SD_RECOVERY_FILE_OTA = "/sdcard/Android/data/com.redbend.client/files/msm8953_64_c801-ota-eng.micronet.zip";
+static const char *SD_RECOVERY_FILE_INCREMENTAL = "/sdcard/Android/data/com.redbend.client/files/msm8953_64-incremental-ota.zip";
 static const char *CACH_RECOVERY_RESULT = "/cache/result";
 static const char *MCU_STATE_FILE = "/sys/class/switch/dock/state";
 
@@ -1165,6 +1167,39 @@ static int apply_from_sdcard(Device* device, bool* wipe_cache) {
     return result;
 }
 
+static int apply_from_sdcard_auto(bool* wipe_cache) {
+
+    int result = INSTALL_ERROR;
+
+    modified_flash = true;
+
+    if (ensure_path_mounted(SDCARD_ROOT) != 0) {
+        ui->Print("\n-- Couldn't mount %s.\n", SDCARD_ROOT);
+        return INSTALL_ERROR;
+    }
+    static const char *SD_RECOVERY_FILE_TEMP;
+    if(wait_for_file(SD_RECOVERY_FILE_INCREMENTAL, 1) == 0){
+        SD_RECOVERY_FILE_TEMP = SD_RECOVERY_FILE_INCREMENTAL;
+    }else if(wait_for_file(SD_RECOVERY_FILE_OTA, 1) == 0){
+        SD_RECOVERY_FILE_TEMP = SD_RECOVERY_FILE_OTA;
+    }else {
+         SD_RECOVERY_FILE_TEMP = SD_RECOVERY_FILE;
+    }
+    
+    result = wait_for_file(SD_RECOVERY_FILE_TEMP, 1);
+    if (result != 0) {
+        ui->Print("\n-- No package file %s.\n", SD_RECOVERY_FILE_TEMP);
+        return INSTALL_ERROR;
+    }
+
+    ui->Print("\n-- Install %s ...\n", SD_RECOVERY_FILE_TEMP);
+    set_sdcard_update_bootloader_message();
+  
+    result = install_package(SD_RECOVERY_FILE_TEMP, wipe_cache,TEMPORARY_INSTALL_FILE, false, 0);
+
+    return result;
+}
+
 static int apply_from_cache(bool* wipe_cache) {
 
     int result = INSTALL_ERROR;
@@ -1295,7 +1330,7 @@ int is_autoapdate(Device::BuiltinAction act[])
         auto_update = 1;
     }
 
-    if(0 == ensure_path_mounted(SDCARD_ROOT) && 0 == wait_for_file(SD_RECOVERY_FILE, 1)) { //system updates sd and cache 
+    if(0 == ensure_path_mounted(SDCARD_ROOT) && (0 == wait_for_file(SD_RECOVERY_FILE, 1) || 0 == wait_for_file(SD_RECOVERY_FILE_OTA, 1) || 0 == wait_for_file(SD_RECOVERY_FILE_INCREMENTAL, 1))) { //system updates sd and cache 
         act[sys_update] = Device::APPLY_SDCARD;
         auto_update = 1;
         modified_flash = true;//for log saving in any case
@@ -1432,7 +1467,12 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                     if(chosen_action == Device::APPLY_RB) {
                         status = apply_from_cache(&should_wipe_cache);
                     } else {
-                        status = apply_from_sdcard(device, &should_wipe_cache);
+                        if(0 == autoupdate) {
+                            ensure_path_mounted(CACHE_ROOT);
+                            status = apply_from_sdcard(device, &should_wipe_cache);
+                        } else {  
+                            status = apply_from_sdcard_auto(&should_wipe_cache);
+                          }
                     }
                     if(1 == autoupdate) {
                         save_result(status);
