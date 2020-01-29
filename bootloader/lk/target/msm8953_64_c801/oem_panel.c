@@ -53,6 +53,7 @@
 #include "include/panel_hx8399c_fhd_pluse_video.h"
 #include "include/panel_hx8399c_hd_plus_video.h"
 #include "include/panel_jd9366_video.h"
+#include "include/panel_jd9366_new_video.h"
 #include "include/panel_nt35521_BYD_video.h"
 
 /*---------------------------------------------------------------------------*/
@@ -262,6 +263,35 @@ static int init_panel_data(struct panel_struct *panelstruct,
 			MAX_TIMING_CONFIG * sizeof(uint32_t));
 		pinfo->mipi.signature =JD9366_VIDEO_SIGNATURE;
 		break;
+	case JD9366_NEW_VIDEO_PANEL:
+		panelstruct->paneldata    = &jd9366_new_video_panel_data;
+		panelstruct->panelres     = &jd9366_new_video_panel_res;
+		panelstruct->color        = &jd9366_new_video_color;
+		panelstruct->videopanel   = &jd9366_new_video_panel;
+		panelstruct->commandpanel = &jd9366_new_video_command_panel;
+		panelstruct->state        = &jd9366_new_video_state;
+		panelstruct->laneconfig   = &jd9366_new_video_lane_config;
+		panelstruct->paneltiminginfo
+			= &jd9366_new_video_timing_info;
+		panelstruct->panelresetseq
+			= &jd9366_new_video_reset_seq;
+		panelstruct->backlightinfo = &jd9366_new_video_backlight;
+		pinfo->mipi.use_enable_gpio = 1;//wangqing.yu add for LCM power gpio
+		panelstruct->paneldata->panel_with_enable_gpio = 1;
+		pinfo->labibb = &jd9366_new_video_labibb;
+		pinfo->mipi.panel_on_cmds
+			= jd9366_new_video_on_command;
+		pinfo->mipi.num_of_panel_on_cmds
+			= ARRAY_SIZE(jd9366_new_video_on_command);
+		pinfo->mipi.panel_off_cmds
+			= jd9366_new_video_off_command;
+		pinfo->mipi.num_of_panel_off_cmds
+			= ARRAY_SIZE(jd9366_new_video_off_command);
+		memcpy(phy_db->timing,
+			jd9366_14nm_new_video_timings,
+			MAX_TIMING_CONFIG * sizeof(uint32_t));
+		pinfo->mipi.signature =JD9366_NEW_VIDEO_SIGNATURE;
+		break;
 	case R69006_1080P_CMD_PANEL:
 		panelstruct->paneldata    = &r69006_1080p_cmd_panel_data;
 		panelstruct->panelres     = &r69006_1080p_cmd_panel_res;
@@ -452,7 +482,11 @@ int oem_panel_select(const char *panel_name, struct panel_struct *panelstruct,
 		if(current_id == JD9366_ID){
 			panel_id = JD9366_VIDEO_PANEL;
 			dprintf(INFO,"-------------JD9366_VIDEO_PANEL---------------\n");
-		}else{
+		}else if(current_id == JD9366_NEW_ID){
+			panel_id = JD9366_NEW_VIDEO_PANEL;
+			dprintf(INFO,"-------------JD9366_NEW_VIDEO_PANEL---------------\n");
+		}
+		else{
 			panel_id = NT35521_BYD_VIDEO_PANEL;
 			dprintf(INFO,"-------------USING DEFAULT---------------\n");
 			dprintf(INFO,"-------------NT35521_BYD_VIDEO_PANEL---------------\n");

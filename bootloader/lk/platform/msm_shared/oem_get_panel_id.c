@@ -74,7 +74,7 @@ static char jd9366_select_page1_cmds_01[] = {
 	0x08, 0x01, 0xFF, 0xFF
 };
 static char jd9366_panel_manufacture_id[] = {
-	0xDA, 0x00, 0x24, 0xA0
+	0xDC, 0x00, 0x24, 0xA0
 };
 static struct mipi_dsi_cmd jd9366_panel_enable_page2_cmd[] = {
 	{sizeof(jd9366_select_page2_cmds_01), jd9366_select_page2_cmds_01,0x0},
@@ -547,8 +547,12 @@ uint32_t mipi_jd9366_manufacture_id(void)
 	data = (data1 >> 16) | (data2 >> 24);
 	data = data & 0xFFFF;
 	dprintf(INFO, "Get jd9366 mipi chip id =0x%x, *lp =0x%x \n", data, *lp);
-
-		return ((data == JD9366_ID) ? JD9366_ID: 0);
+	if (data == JD9366_ID)
+		return JD9366_ID;
+	else if(data == JD9366_NEW_ID)
+		return JD9366_NEW_ID;
+	else
+		return 0;
 }
 uint32_t mipi_nt35590_manufacture_id(void)
 {
