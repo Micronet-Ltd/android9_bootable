@@ -1269,11 +1269,18 @@ static int wait_for_file(const char *filename, int timeout)
 
 static int get_dock_state() {
     int state = 0;
+    time_t timeout_time = gettime() + 8000;
 
-    if (0 == wait_for_file(MCU_STATE_FILE, 1)) {
+    if (0 == wait_for_file(MCU_STATE_FILE, 8)) {
         FILE* source_fp = fopen(MCU_STATE_FILE, "r");
         if (source_fp != 0) {
-            fscanf(source_fp, "%d", &state);
+            do {
+                fscanf(source_fp, "%d", &state);
+                if (state) {
+                    break;
+                }
+                usleep(10000);
+            } while (gettime() < timeout_time); 
             fclose(source_fp);
         }
     }
@@ -1403,7 +1410,18 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                 if(get_dock_state() <= 0) {//don't start if disconnected
                     ui->Print("Cradle is not connected.\n");
                     if(1 == autoupdate) {
-                        return Device::REBOOT;
+                        autoupdate = 0;
+                        copy_logs();
+                        if (android::base::GetBoolProperty("ro.build.system_root_image", false)) {
+                            if (ensure_path_mounted_at("/", "/system_root") != -1) {
+                                ui->Print("Mounted /system.\n");
+                            }
+                        } else {
+                            if (ensure_path_mounted("/system") != -1) {
+                                ui->Print("Mounted /system.\n");
+                            }
+                        }
+                        //return Device::REBOOT;
                     }
                     break;
                 }
@@ -1430,6 +1448,7 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                         modified_flash = true;
                         break;
                     }
+                    copy_logs();
                     return Device::REBOOT;
                 }
                 break;
@@ -1472,7 +1491,7 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                             status = apply_from_sdcard(device, &should_wipe_cache);
                         } else {  
                             status = apply_from_sdcard_auto(&should_wipe_cache);
-                          }
+                        }
                     }
                     if(1 == autoupdate) {
                         save_result(status);
@@ -1503,25 +1522,25 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
             case Device::RUN_GRAPHICS_TEST:
                 run_graphics_test();
                 break;
-          case Device::RUN_LOCALE_TEST: {
-              ScreenRecoveryUI* screen_ui = static_cast<ScreenRecoveryUI*>(ui);
-              screen_ui->CheckBackgroundTextImages(locale);
-              break;
-          }
-          case Device::MOUNT_SYSTEM:
-            // For a system image built with the root directory (i.e. system_root_image == "true"), we
-            // mount it to /system_root, and symlink /system to /system_root/system to make adb shell
-            // work (the symlink is created through the build system). (Bug: 22855115)
-            if (android::base::GetBoolProperty("ro.build.system_root_image", false)) {
-                if (ensure_path_mounted_at("/", "/system_root") != -1) {
-                    ui->Print("Mounted /system.\n");
-                }
-            } else {
-                if (ensure_path_mounted("/system") != -1) {
-                    ui->Print("Mounted /system.\n");
-                }
+            case Device::RUN_LOCALE_TEST: {
+                ScreenRecoveryUI* screen_ui = static_cast<ScreenRecoveryUI*>(ui);
+                screen_ui->CheckBackgroundTextImages(locale);
+                break;
             }
-            break;
+            case Device::MOUNT_SYSTEM:
+                // For a system image built with the root directory (i.e. system_root_image == "true"), we
+                // mount it to /system_root, and symlink /system to /system_root/system to make adb shell
+                // work (the symlink is created through the build system). (Bug: 22855115)
+                if (android::base::GetBoolProperty("ro.build.system_root_image", false)) {
+                    if (ensure_path_mounted_at("/", "/system_root") != -1) {
+                        ui->Print("Mounted /system.\n");
+                    }
+                } else {
+                    if (ensure_path_mounted("/system") != -1) {
+                        ui->Print("Mounted /system.\n");
+                    }
+                }
+                break;
         }
     }
 }
