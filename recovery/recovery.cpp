@@ -1269,21 +1269,25 @@ static int wait_for_file(const char *filename, int timeout)
 
 static int get_dock_state() {
     int state = 0;
-    time_t timeout_time = gettime() + 8000;
+    time_t timeout_time = gettime() + 40;
 
     if (0 == wait_for_file(MCU_STATE_FILE, 8)) {
-        FILE* source_fp = fopen(MCU_STATE_FILE, "r");
-        if (source_fp != 0) {
-            do {
+        timeout_time = gettime() + 40;
+        do {
+            FILE* source_fp = fopen(MCU_STATE_FILE, "r");
+            if (source_fp != 0) {
                 fscanf(source_fp, "%d", &state);
-                if (state) {
+                fclose(source_fp);
+                if (state > 0) {
                     break;
                 }
                 usleep(10000);
-            } while (gettime() < timeout_time); 
-            fclose(source_fp);
-        }
+            }
+        } while (gettime() < timeout_time); 
     }
+
+    LOG(INFO) << __func__ << ":" << state << "[" << gettime() << "]";
+
     return state;
 }
 
@@ -1335,6 +1339,7 @@ int is_autoapdate(Device::BuiltinAction act[])
     if (mcu_update_exists()) {
         act[mcu_update] = Device::APPLY_MCU_FPGA;
         auto_update = 1;
+        modified_flash = true;//for log saving in any case
     }
 
     if(0 == ensure_path_mounted(SDCARD_ROOT) && (0 == wait_for_file(SD_RECOVERY_FILE, 1) || 0 == wait_for_file(SD_RECOVERY_FILE_OTA, 1) || 0 == wait_for_file(SD_RECOVERY_FILE_INCREMENTAL, 1))) { //system updates sd and cache 
@@ -1352,6 +1357,22 @@ int is_autoapdate(Device::BuiltinAction act[])
     }
     return auto_update;
 }
+
+#undef REDIRECT_STDIO
+#define MCU_UPD_LOG     "/cache/rec_mcu_ua.log"
+//#define REDIRECT_STDIO MCU_UPD_LOG
+//#define REDIRECT_STDIO TTYHSL0_UPD_LOG
+
+#if defined (REDIRECT_STDIO)
+static void redirect_stdio_m(const char* filename)
+{
+    // If these fail, there's not really anywhere to complain...
+    freopen(filename, "a", stdout);
+    setbuf(stdout, 0);
+    freopen(filename, "a", stderr);
+    setbuf(stderr, 0);
+}
+#endif
 
 // Returns REBOOT, SHUTDOWN, or REBOOT_BOOTLOADER. Returning NO_ACTION means to take the default,
 // which is to reboot or shutdown depending on if the --shutdown_after flag was passed to recovery.
@@ -1407,27 +1428,30 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
             case Device::REBOOT_BOOTLOADER:
                 return chosen_action;
             case Device::APPLY_MCU_FPGA:
+                ensure_path_mounted(CACHE_ROOT);
+                #if defined (REDIRECT_STDIO)
+                    redirect_stdio_m(REDIRECT_STDIO);
+                    LOG(INFO) << __func__ << ": mount system";
+                    if (android::base::GetBoolProperty("ro.build.system_root_image", false)) {
+                        if (ensure_path_mounted_at("/", "/system_root") != -1) {
+                            ui->Print("Mounted /system.\n");
+                        }
+                    } else {
+                        if (ensure_path_mounted("/system") != -1) {
+                            ui->Print("Mounted /system.\n");
+                        }
+                    }
+                #endif
                 if(get_dock_state() <= 0) {//don't start if disconnected
                     ui->Print("Cradle is not connected.\n");
+                    printf("cradle detached %d[%d]\n", get_dock_state(), (int)gettime());
                     if(1 == autoupdate) {
-                        autoupdate = 0;
-                        copy_logs();
-                        if (android::base::GetBoolProperty("ro.build.system_root_image", false)) {
-                            if (ensure_path_mounted_at("/", "/system_root") != -1) {
-                                ui->Print("Mounted /system.\n");
-                            }
-                        } else {
-                            if (ensure_path_mounted("/system") != -1) {
-                                ui->Print("Mounted /system.\n");
-                            }
-                        }
-                        //return Device::REBOOT;
+                        return Device::REBOOT;
                     }
                     break;
                 }
                 ui->Print("Updating from MCU/FPGA\nDon't cut the power\n");
                 android::base::SetProperty("ctl.stop", "mcu_ua");
-                ensure_path_mounted("/cache");
 
                 if(0 == autoupdate) {
                    if(!mcu_update_exists()) {
@@ -1441,6 +1465,9 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                 wait_for_file("/tmp/.rb_mcu_update_done", -1);
                 ui->Print("Complete\n");
 
+                #if defined (REDIRECT_STDIO)
+                    redirect_stdio(TEMPORARY_LOG_FILE);
+                #endif
                 //continue system update
                 if(1 == autoupdate) {
                     if(Device::NO_ACTION != act[sys_update]) {
@@ -1448,7 +1475,6 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                         modified_flash = true;
                         break;
                     }
-                    copy_logs();
                     return Device::REBOOT;
                 }
                 break;
@@ -1540,7 +1566,7 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
                         ui->Print("Mounted /system.\n");
                     }
                 }
-                break;
+                break; 
         }
     }
 }
